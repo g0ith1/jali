@@ -4,18 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تسجيل الدخول - نظام الشفتات</title>
+    <!-- استدعاء مكتبة Supabase الرسمية -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="db.js"></script>
     <style>
         body { font-family: Tahoma, sans-serif; background: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 350px; }
-        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+        .login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 380px; }
+        h2 { text-align: center; color: #333; margin-bottom: 25px; }
         .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; color: #555; }
-        input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }
-        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        label { display: block; margin-bottom: 5px; color: #555; font-weight: bold; }
+        input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px; }
         button:hover { background: #0056b3; }
-        .error { color: red; text-align: center; margin-top: 10px; font-size: 14px; }
+        .error { color: red; text-align: center; margin-top: 15px; font-size: 14px; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -37,18 +37,25 @@
 </div>
 
 <script>
+    // بيانات الاتصال المباشرة بقاعدة البيانات
+    const SUPABASE_URL = 'https://lldgzyfqoolpfolqhxdq.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_DnGTqp9Ylcs6ikwV4Dp3zw_u-HjGYoA';
+    
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const user = document.getElementById('username').value.trim();
         const pass = document.getElementById('password').value.trim();
         const errorMsg = document.getElementById('errorMsg');
+        errorMsg.textContent = 'جاري التحقق من الاتصال...';
 
         try {
             const { data, error } = await db
                 .from('employees')
                 .select('*')
                 .eq('username', user)
-                .eq('password', pass)
+                .eq('password_hash', pass)
                 .single();
 
             if (error || !data) {
@@ -56,7 +63,6 @@
                 return;
             }
 
-            // حفظ بيانات المستخدم الجلسة
             localStorage.setItem('currentUser', JSON.stringify(data));
 
             if (data.role === 'admin') {
@@ -65,7 +71,7 @@
                 window.location.href = 'employee.html';
             }
         } catch (err) {
-            errorMsg.textContent = 'حدث خطأ في الاتصال بقاعدة البيانات';
+            errorMsg.textContent = 'خطأ في الاتصال بقاعدة البيانات: ' + err.message;
         }
     });
 </script>
