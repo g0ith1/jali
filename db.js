@@ -1,6 +1,6 @@
-// بيانات الاتصال بقاعدة بيانات Supabase
-const SUPABASE_URL = 'ضع_رابط_مشروعك_هنا';
-const SUPABASE_KEY = 'ضع_مفتاح_الكين_هنا';
+// بيانات الاتصال بقاعدة بيانات Supabase الخاصة بمشروعك
+const SUPABASE_URL = 'https://lldgzyfqoolpfolqhxdq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_DnGTqp9Ylcs6ikwV4Dp3zw_u-HjGYoA';
 
 // إنشاء كائن الاتصال وتثبيته في نافذة الصفحة
 window.db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
