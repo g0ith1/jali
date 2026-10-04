@@ -149,7 +149,7 @@
         </div>
     </div>
 
-    <script src="db.js?v=2.0"></script>
+    <script src="db.js?v=2.1"></script>
     <script>
         const session = JSON.parse(localStorage.getItem('employee_session') || '{}');
         document.getElementById('emp-welcome').textContent = 'مرحباً، ' + (session.full_name || 'موظف');
@@ -184,12 +184,17 @@
         async function startShift() {
             const initialCash = parseFloat(document.getElementById('init-cash').value) || 0;
             try {
-                const { data, error } = await db.from('shifts').insert([{
+                const { error } = await db.from('shifts').insert([{
                     employee_id: session.id,
                     shift_type: session.shift_type || 'صباحي',
                     initial_cash: initialCash,
                     status: 'open'
-                }].select()).single();
+                }]);
+
+                if (error) {
+                    alert("خطأ قاعدة البيانات: " + error.message);
+                    return;
+                }
 
                 alert("تم بدء الشفت بنجاح!");
                 location.reload();
@@ -213,7 +218,7 @@
             const finalTotal = baseCash + t + m;
 
             try {
-                await db.from('shifts').update({
+                const { error } = await db.from('shifts').update({
                     sold_transactions_total: t,
                     misc_sold_total: m,
                     final_expected_total: finalTotal,
@@ -221,10 +226,15 @@
                     status: 'completed'
                 }).eq('id', currentShiftId);
 
+                if (error) {
+                    alert("خطأ أثناء الإغلاق: " + error.message);
+                    return;
+                }
+
                 alert("تم إغلاق الشفت بنجاح وترحيل البيانات للمدير!");
                 location.reload();
             } catch (e) {
-                alert("حدث خطأ أثناء إغلاق الشفت");
+                alert("حدث خطأ غير متوقع أثناء إغلاق الشفت");
             }
         }
 
