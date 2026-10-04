@@ -1,1 +1,239 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة الموظف - إدارة الشفت</title>
+    <script>
+        const empSession = localStorage.getItem('employee_session');
+        if (!empSession) {
+            window.location.href = 'login.html';
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --success-bg: #dcfce7;
+            --success-text: #166534;
+        }
 
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            direction: rtl;
+        }
+
+        .app-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .main-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 20px 30px;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .btn {
+            padding: 11px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: var(--text-main);
+        }
+
+        .status-box {
+            background: var(--success-bg);
+            color: var(--success-text);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <header class="main-header">
+            <h1>بوابة الموظف</h1>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span id="emp-welcome" style="font-weight: 600; color: var(--text-muted);"></span>
+                <button onclick="logoutEmp()" class="btn btn-secondary">تسجيل خروج</button>
+            </div>
+        </header>
+
+        <!-- حالة الشفت -->
+        <div id="shift-status-container" class="card">
+            <h3 style="margin-top: 0;">حالة الشفت الحالي</h3>
+            <div id="no-active-shift">
+                <p style="color: var(--text-muted);">ليس لديك شفت مفتوح حالياً. يمكنك بدء شفت جديد أدناه:</p>
+                <div class="form-group">
+                    <label>الرصيد الافتتاحي في الصندوق ($)</label>
+                    <input type="number" id="init-cash" value="0.00" step="0.01">
+                </div>
+                <button onclick="startShift()" class="btn btn-primary">بدء الشفت الآن</button>
+            </div>
+
+            <div id="active-shift-panel" style="display: none;">
+                <div class="status-box">الشفت مفتوح ويعمل حالياً 🟢</div>
+                <div class="form-group">
+                    <label>مبيعات المعاملات ($)</label>
+                    <input type="number" id="sold-trans" value="0.00" step="0.01" oninput="calcTotal()">
+                </div>
+                <div class="form-group">
+                    <label>مبيعات متفرقة ($)</label>
+                    <input type="number" id="misc-sold" value="0.00" step="0.01" oninput="calcTotal()">
+                </div>
+                <p><strong>الإجمالي المتوقع في الصندوق: </strong> <span id="expected-total" style="color: var(--primary-color); font-size: 18px;">$0.00</span></p>
+                <button onclick="closeShift()" class="btn btn-primary" style="background-color: #dc2626;">إنهاء وإغلاق الشفت</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="db.js?v=2.0"></script>
+    <script>
+        const session = JSON.parse(localStorage.getItem('employee_session') || '{}');
+        document.getElementById('emp-welcome').textContent = 'مرحباً، ' + (session.full_name || 'موظف');
+
+        let currentShiftId = null;
+        let baseCash = 0;
+
+        async function checkActiveShift() {
+            try {
+                const { data, error } = await db.from('shifts')
+                    .select('*')
+                    .eq('employee_id', session.id)
+                    .eq('status', 'open')
+                    .maybeSingle();
+
+                if (data) {
+                    currentShiftId = data.id;
+                    baseCash = parseFloat(data.initial_cash || 0);
+                    document.getElementById('init-cash').value = baseCash;
+                    document.getElementById('sold-trans').value = data.sold_transactions_total || 0;
+                    document.getElementById('misc-sold').value = data.misc_sold_total || 0;
+
+                    document.getElementById('no-active-shift').style.display = 'none';
+                    document.getElementById('active-shift-panel').style.display = 'block';
+                    calcTotal();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function startShift() {
+            const initialCash = parseFloat(document.getElementById('init-cash').value) || 0;
+            try {
+                const { data, error } = await db.from('shifts').insert([{
+                    employee_id: session.id,
+                    shift_type: session.shift_type || 'صباحي',
+                    initial_cash: initialCash,
+                    status: 'open'
+                }].select()).single();
+
+                alert("تم بدء الشفت بنجاح!");
+                location.reload();
+            } catch (e) {
+                alert("حدث خطأ أثناء فتح الشفت: " + e.message);
+            }
+        }
+
+        function calcTotal() {
+            const t = parseFloat(document.getElementById('sold-trans').value) || 0;
+            const m = parseFloat(document.getElementById('misc-sold').value) || 0;
+            const total = baseCash + t + m;
+            document.getElementById('expected-total').textContent = '$' + total.toFixed(2);
+        }
+
+        async function closeShift() {
+            if (!confirm("هل أنت متأكد من إنهاء وإغلاق الشفت الحالي؟")) return;
+
+            const t = parseFloat(document.getElementById('sold-trans').value) || 0;
+            const m = parseFloat(document.getElementById('misc-sold').value) || 0;
+            const finalTotal = baseCash + t + m;
+
+            try {
+                await db.from('shifts').update({
+                    sold_transactions_total: t,
+                    misc_sold_total: m,
+                    final_expected_total: finalTotal,
+                    end_time: new Date().toISOString(),
+                    status: 'completed'
+                }).eq('id', currentShiftId);
+
+                alert("تم إغلاق الشفت بنجاح وترحيل البيانات للمدير!");
+                location.reload();
+            } catch (e) {
+                alert("حدث خطأ أثناء إغلاق الشفت");
+            }
+        }
+
+        function logoutEmp() {
+            localStorage.removeItem('employee_session');
+            window.location.href = 'login.html';
+        }
+
+        checkActiveShift();
+    </script>
+</body>
+</html>
